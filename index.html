@@ -1,8 +1,8 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 移动端核心适配设置 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>绩效核算器</title>
     <style>
@@ -28,7 +28,7 @@
         h2 {
             text-align: center;
             color: #1f2937;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
             font-weight: 600;
             font-size: 22px;
         }
@@ -37,14 +37,14 @@
         }
         label {
             display: block;
-            margin-bottom: 7px;
+            margin-bottom: 6px;
             font-size: 15px;
             color: #374151;
             font-weight: 500;
         }
         input, select {
             width: 100%;
-            height: 46px;
+            height: 44px;
             padding: 0 14px;
             border: 1px solid #d1d9e6;
             border-radius: 9px;
@@ -59,14 +59,32 @@
             background:#f7f9fc;
             color:#1f2937;
         }
+        /* 双栏并排布局 */
+        .row-two-col{
+            display:flex;
+            gap:10px;
+            margin-bottom:20px;
+        }
+        .row-two-col .form-item{
+            flex:1;
+            margin-bottom:0;
+        }
+        /* 隐藏number输入框上下箭头 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+        }
+        input[type="number"]{
+            -moz-appearance: textfield;
+        }
         .button-wrap {
             display: flex;
             gap: 12px;
-            margin-top: 24px;
+            margin-top: 10px;
         }
         button {
             flex: 1;
-            height: 48px;
+            height: 46px;
             border: none;
             border-radius: 9px;
             font-size: 16px;
@@ -81,32 +99,19 @@
             color: #333;
         }
         .result-area {
-            margin-top: 26px;
-            padding: 20px;
+            margin-top: 22px;
+            padding: 18px;
             background-color: #f0f7ff;
             border-radius: 10px;
-        }
-        .result-area h4 {
-            margin-bottom: 10px;
-            color: #1f2937;
-            font-size:16px;
-        }
-        .result-line{
-            margin:8px 0;
-            font-size:15px;
+            text-align:center;
         }
         #totalResult {
-            margin-top:14px;
-            font-size: 24px;
+            font-size: 26px;
             font-weight: bold;
             color: #0958d9;
         }
         .tip-error{
             color:#dc2626;
-            font-weight:500;
-        }
-        .tip-extra{
-            color:#b45309;
             font-weight:500;
         }
     </style>
@@ -116,33 +121,36 @@
         <h2>绩效核算器</h2>
 
         <div class="form-item">
-            <label>目标转化率（自行选择标准）</label>
+            <label>目标转化率</label>
             <select id="targetSelect">
-                <option value="0.07">7%</option>
-                <option value="0.075">7.5%</option>
-                <option value="0.10">10%</option>
+                <!-- JS自动生成选项 -->
             </select>
         </div>
 
-        <div class="form-item">
-            <label>出单科目</label>
-            <select id="actualNum">
-                <option value="">请选择出单科目</option>
-            </select>
+        <!-- 出单科目 + 带班人数 同一行 -->
+        <div class="row-two-col">
+            <div class="form-item">
+                <label>出单科目</label>
+                <select id="actualNum">
+                    <!-- 不再保留【请选择】空白选项 -->
+                </select>
+            </div>
+            <div class="form-item">
+                <label>带班人数</label>
+                <input type="number" id="personCount" placeholder="填写人数">
+            </div>
         </div>
 
-        <div class="form-item">
-            <label>带班人数</label>
-            <input type="number" id="personCount" placeholder="输入带班人数">
-        </div>
-
-        <div class="form-item">
-            <label>匹配绩效系数</label>
-            <input class="read-input" readonly id="ratioShow" value="--">
-        </div>
-        <div class="form-item">
-            <label>单人带班费标准（元）</label>
-            <input class="read-input" readonly id="priceShow" value="--">
+        <!-- 绩效系数 + 单人带班费 同一行 -->
+        <div class="row-two-col">
+            <div class="form-item">
+                <label>绩效系数</label>
+                <input class="read-input" readonly id="ratioShow" value="--">
+            </div>
+            <div class="form-item">
+                <label>单人带班费(元)</label>
+                <input class="read-input" readonly id="priceShow" value="--">
+            </div>
         </div>
 
         <div class="button-wrap">
@@ -151,126 +159,147 @@
         </div>
 
         <div class="result-area">
-            <h4>核算信息</h4>
-            <div id="infoLine" class="result-line"></div>
             <div id="totalResult">--</div>
         </div>
     </div>
 
 <script>
-    // 自动生成出单科目下拉 0 ~ 30
-    const actualSelect = document.getElementById('actualNum');
-    for(let i = 0; i <= 30; i++){
-        let opt = document.createElement('option');
-        opt.value = i;
-        opt.innerText = i;
-        actualSelect.appendChild(opt);
+// ==============================================
+//                【业务配置区 - 仅修改此处】
+// ==============================================
+// 目标转化率：5% ~ 13%，间隔0.5%，程序自动生成
+const rateStart = 5;
+const rateEnd = 13;
+const rateStep = 0.5;
+// 默认选中：7%
+const defaultSelectRate = 7;
+
+// 2.绩效区间表 [下限%,上限%,绩效系数,单人带班费标准]
+const ruleTable = [
+    [0, 20, 0, 0],
+    [20, 35, 0.5, 3.5],
+    [35, 50, 0.8, 4],
+    [50, 60, 1.1, 4.5],
+    [60, 70, 1.4, 5],
+    [70, 80, 1.6, 5.5],
+    [80, 90, 1.8, 6],
+    [90, 100, 1.9, 6.5],
+    [100, 110, 2, 7.5],
+    [110, 120, 2.1, 8],
+    [120, 130, 2.2, 8.5],
+    [130, 140, 2.3, 9],
+    [140, 150, 2.4, 9.5],
+    [150, 160, 2.5, 10],
+    [160, 170, 2.6, 10.5],
+    [170, 180, 2.7, 11.5],
+    [180, 190, 2.8, 12.5],
+    [190, 200, 2.9, 13.5],
+    [200, 210, 3.1, 14.5],
+    [210, 220, 3.3, 15.5],
+    [220, 240, 3.5, 16.5]
+];
+
+// 3.完成度≥240%超额规则参数
+const baseOverRatio = 3.5;
+const baseOverPrice = 16.5;
+const stepPercent = 20;
+const stepRatioAdd = 0.4;
+
+// 4.出单科目最大可选数值
+const maxOrderNum = 30;
+// ==============================================
+//              【下方代码禁止修改】
+// ==============================================
+
+// 自动生成 5% ~13% 步长0.5% 目标转化率下拉
+const targetSelect = document.getElementById('targetSelect');
+for(let r = rateStart; r <= rateEnd; r += rateStep){
+    const opt = document.createElement('option');
+    const decimalVal = r / 100;
+    opt.value = decimalVal;
+    opt.innerText = r + "%";
+    if(r === defaultSelectRate){
+        opt.selected = true;
+    }
+    targetSelect.appendChild(opt);
+}
+
+// 自动渲染出单科目下拉 0~maxOrderNum（无空白请选择项）
+const actualSelect = document.getElementById('actualNum');
+for(let i = 0; i <= maxOrderNum; i++){
+    let opt = document.createElement('option');
+    opt.value = i;
+    opt.innerText = i;
+    actualSelect.appendChild(opt);
+}
+
+const calcBtn = document.getElementById('calcBtn');
+const resetBtn = document.getElementById('resetBtn');
+const personInput = document.getElementById('personCount');
+
+// 限制带班人数只能输入整数
+personInput.addEventListener('input', function(){
+    let val = this.value;
+    this.value = val.replace(/\.\d*/,'');
+});
+
+function compute(){
+    const targetRate = parseFloat(document.getElementById('targetSelect').value);
+    const actual = document.getElementById('actualNum').value;
+    const peopleStr = personInput.value;
+    const people = parseInt(peopleStr,10);
+
+    if(peopleStr === ""){
+        document.getElementById('totalResult').innerHTML = `<span class="tip-error">请填写带班人数</span>`;
+        return;
+    }
+    if(isNaN(people) || people <= 0){
+        document.getElementById('totalResult').innerHTML = `<span class="tip-error">带班人数需大于0整数</span>`;
+        return;
+    }
+    const actualNum = parseInt(actual,10);
+
+    let realConversion = actualNum / people;
+    let finishPercent = (realConversion / targetRate) * 100;
+
+    let matchRatio = 0;
+    let matchPrice = 0;
+
+    for(let item of ruleTable){
+        const low = item[0];
+        const high = item[1];
+        if(finishPercent >= low && finishPercent < high){
+            matchRatio = item[2];
+            matchPrice = item[3];
+            break;
+        }
     }
 
-    // 绩效区间对照表
-    const ruleTable = [
-        [0, 20, 0, 0],
-        [20, 35, 0.5, 3.5],
-        [35, 50, 0.8, 4],
-        [50, 60, 1.1, 4.5],
-        [60, 70, 1.4, 5],
-        [70, 80, 1.6, 5.5],
-        [80, 90, 1.8, 6],
-        [90, 100, 1.9, 6.5],
-        [100, 110, 2, 7.5],
-        [110, 120, 2.1, 8],
-        [120, 130, 2.2, 8.5],
-        [130, 140, 2.3, 9],
-        [140, 150, 2.4, 9.5],
-        [150, 160, 2.5, 10],
-        [160, 170, 2.6, 10.5],
-        [170, 180, 2.7, 11.5],
-        [180, 190, 2.8, 12.5],
-        [190, 200, 2.9, 13.5],
-        [200, 210, 3.1, 14.5],
-        [210, 220, 3.3, 15.5],
-        [220, 240, 3.5, 16.5]
-    ];
-
-    const calcBtn = document.getElementById('calcBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const personInput = document.getElementById('personCount');
-
-    // 限制带班人数只能输入整数，禁止小数点
-    personInput.addEventListener('input', function(){
-        let val = this.value;
-        this.value = val.replace(/\.\d*/,'');
-    });
-
-    function compute(){
-        const targetRate = parseFloat(document.getElementById('targetSelect').value);
-        const actual = document.getElementById('actualNum').value;
-        const peopleStr = personInput.value;
-        const people = parseInt(peopleStr,10);
-
-        if(actual === "" || peopleStr === ""){
-            document.getElementById('infoLine').innerHTML = `<span class="tip-error">请选择出单科目并填写带班人数</span>`;
-            clearResult();
-            return;
-        }
-        if(isNaN(people) || people <= 0){
-            document.getElementById('infoLine').innerHTML = `<span class="tip-error">带班人数必须为大于0的整数</span>`;
-            clearResult();
-            return;
-        }
-        const actualNum = parseInt(actual,10);
-
-        let realConversion = actualNum / people;
-        let finishPercent = (realConversion / targetRate) * 100;
-
-        let matchRatio = 0;
-        let matchPrice = 0;
-        let overExtra = false;
-
-        for(let item of ruleTable){
-            const low = item[0];
-            const high = item[1];
-            if(finishPercent >= low && finishPercent < high){
-                matchRatio = item[2];
-                matchPrice = item[3];
-                break;
-            }
-        }
-
-        // 超过240%超额计算规则
-        if(finishPercent >= 240){
-            overExtra = true;
-            matchPrice = 16.5;
-            const delta = finishPercent - 220;
-            const level = Math.floor(delta / 20);
-            matchRatio = 3.5 + level * 0.4;
-        }
-
-        document.getElementById('ratioShow').value = matchRatio.toFixed(2);
-        document.getElementById('priceShow').value = matchPrice.toFixed(2);
-        let totalMoney = matchPrice * people * matchRatio;
-
-        if(overExtra){
-            document.getElementById('infoLine').innerHTML = `<span class="tip-extra">完成度超出240%，启用超额累进规则核算</span>`;
-        }else{
-            document.getElementById('infoLine').innerText = "成功匹配绩效档位";
-        }
-        document.getElementById('totalResult').innerText = `总带班绩效：${totalMoney.toFixed(2)} 元`;
+    if(finishPercent >= 240){
+        matchPrice = baseOverPrice;
+        const delta = finishPercent - 220;
+        const level = Math.floor(delta / stepPercent);
+        matchRatio = baseOverRatio + level * stepRatioAdd;
     }
 
-    function clearResult(){
-        document.getElementById('ratioShow').value = "--";
-        document.getElementById('priceShow').value = "--";
-        document.getElementById('infoLine').innerText = "";
-        document.getElementById('totalResult').innerText = "--";
-    }
+    document.getElementById('ratioShow').value = matchRatio.toFixed(2);
+    document.getElementById('priceShow').value = matchPrice.toFixed(2);
+    let totalMoney = matchPrice * people * matchRatio;
 
-    calcBtn.onclick = compute;
-    resetBtn.onclick = function(){
-        document.getElementById('actualNum').value = "";
-        personInput.value = '';
-        clearResult();
-    }
+    document.getElementById('totalResult').innerText = `总带班绩效：${totalMoney.toFixed(2)} 元`;
+}
+
+function clearResult(){
+    document.getElementById('ratioShow').value = "--";
+    document.getElementById('priceShow').value = "--";
+    document.getElementById('totalResult').innerText = "--";
+}
+
+calcBtn.onclick = compute;
+resetBtn.onclick = function(){
+    document.getElementById('personCount').value = '';
+    clearResult();
+}
 </script>
 </body>
 </html>
